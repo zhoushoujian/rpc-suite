@@ -18,5 +18,5 @@
 15. 在主控机按下ctrl+c时提示用户请手动运行reset_remote.js以停止远程机的任务执行
 
 未完成：
-nodejs对于windows和linux的有些操作不能完全兼容可以理解(process.kill(pid)),而centos和kali的有些命令竟然也不能兼容,那就简直差评了(获取cpu使用率)
-提供多核处理计算任务(nodejs适合io密集型，不适合cpu密集型)
+1. nodejs对于windows和linux的有些操作不能完全兼容可以理解(process.kill(pid)),而centos和kali的有些命令竟然也不能兼容,那就简直差评了(获取cpu使用率)
+2. 提供多核处理计算任务(nodejs适合io密集型，不适合cpu密集型)
