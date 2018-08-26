@@ -1,0 +1,13 @@
+{
+  "name": "test",
+  "version": "1.0.0",
+  "description": "rpc based by nodejs",
+  "author": "zhoushoujian",
+  "keyword": "rpc",
+  "main": "",
+  "dependencies": {
+    "chokidar": "^2.0.4",
+    "colors": "^1.3.1"
+  },
+  "devDependencies": {}
+}
