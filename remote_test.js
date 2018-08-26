@@ -8,11 +8,10 @@ let local = () => {},
     remote04 = () => {},
     //远程执行机的启用开关
     one = true,
-    two = true,
-    three = true,
-    four = true,
+    two = false,
+    three = false,
+    four = false,
     REMOTE_IP = [],
-    finalResult = "",
     http = require('http'),
     cluster = require("cluster");
 
@@ -47,9 +46,11 @@ function Product(i, ...arg) {
     }
 }
 
+//每个子进程都会运行一遍上面的程序
 //开启多进程 => 第一个进程用于执行任务,第二个进程用于执行任务期间查询并接收服务传来的状态
 let numCPUs = require("os").cpus().length;
 if (cluster.isMaster) {
+    //主进程的程序智慧运行一遍
     //先检查所有远程机状态(20秒后才能返回检查结果)
     return new Promise(function (resolve, reject) {
         logger.info("启用的远程机ip", available_ip);
@@ -94,6 +95,7 @@ if (cluster.isMaster) {
     }))).then(() => {
         //预备工作执行完再fork多进程
         for (var i = 0; i < numCPUs; i++) {
+            //fork出工作线程后子进程会直接进入子进程模块执行
             cluster.fork();
         }
         cluster.on('listening', function (worker, address) {
@@ -103,14 +105,11 @@ if (cluster.isMaster) {
             //console.log('[master] ' + 'online: worker' + worker.id);
         });
         cluster.on('disconnect', function (worker) {
-            console.log('[master] ' + 'disconnect: worker' + worker.id);
+            logger.warn('[master] ' + 'disconnect: worker' + worker.id);
         });
         cluster.on('exit', function (worker, code, signal) {
-            console.warn('worker ' + worker.process.pid + ' died');
+            logger.warn('worker ' + worker.process.pid + ' died');
         });
-    })
-} else {
-    if (cluster.worker.id === 1) {
         //对执行任务的时间进行统计
         console.time("time");
         return new Promise(function (res, rej) {
@@ -141,39 +140,61 @@ if (cluster.isMaster) {
             logger.info("正在执行任务，请稍后")
             return Promise.all([remote01(), remote02(), remote03(), remote04()]) //最后执行任务
                 .then((s) => {
-                    //全部执行完再输出结果
-                    finalResult = s; //用于结束结束远程机执行状态回显(有点问题))
-                    logger.info("final result", s);
-                    console.timeEnd("time");
-                    process.abort();
-                    process.exit(0);
+                    return new Promise(function (res) {
+                        //全部执行完再输出结果
+                        logger.info("final result", s);
+                        console.timeEnd("time");
+                        //将结果发送到子进程,父子进程和孖子进程传递消息与react类似
+                        Object.keys(cluster.workers).forEach((id) => {
+                            cluster.workers[id].send(s);
+                        });
+                        //cluster.disconnect();
+                        process.exit(0);
+                        res(s);
+                    })
                 })
                 .catch((error) => {
                     logger.error("remote_test error", error);
+                    process.abort();
                 })
         })
-    } else if (cluster.worker.id === 2) {
+    })
+} else {
+    if (cluster.worker.id === 1) {
+        //master运行得到的结果保存到顶部变量,子进程是获取不到的
+        let finalResult = [];
+        process.on('message', (msg) => {
+            logger.info('worker' + cluster.worker.id + ' got the master msg：' + msg);
+            finalResult = msg;
+        });
+
         function remote_info() {
-            if (finalResult) {
+            if (finalResult.length) {
                 //任务执行完成后停止查询
                 clearInterval(timer);
-                process.exit(0);
+                process.nextTick(process.exit(0));
             }
             return Promise.all(available_ip.map((v, i) => {
                     return remote(i, function () {
                         return checkstate();
                     })
-                })).then((result) => new Promise(function (res, rej) {
+                }))
+                .then((result) => new Promise(function (res, rej) {
                     logger.debug("remote info", result);
                     res(result);
                 }))
                 .catch(error => {
                     logger.error("remote info error", error);
-                    // process.exit(0)
+                    process.exit(0)
                 });
         }
         let timer = setInterval(remote_info, 20000);
-
+        process.on('exit', (code) => {
+            logger.warn(code);
+        });
+        process.on('uncaughtException', (err) => {
+            logger.error(err);
+        });
         //结束主控机程序时同时重置远程机状态(有点问题)
         process.on('SIGINT', function () {
             logger.info('任务被用户取消，请手动运行reset_remote.js以停止远程机的任务执行');
@@ -184,11 +205,22 @@ if (cluster.isMaster) {
                         logger.info('远程机已停止操作，程序即将退出');
                     });
                 })
-            })).then(() => {
-                setTimeout(function () {
-                    process.exit(0);
-                }, 2500)
+            })).then(() => new Promise(function (res) {
+                res(process.exit(0))
+            }))
+        });
+    } else {
+        process.on('message', (msg) => {
+            logger.debug('worker' + cluster.worker.id + ' got the master msg：' + msg);
+            setTimeout(() => {
+                process.exit(0);
             })
+        });
+        process.on('exit', (code) => {
+            logger.warn(code);
+        });
+        process.on('uncaughtException', (err) => {
+            logger.error(err);
         });
     }
 }
