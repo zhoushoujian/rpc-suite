@@ -15,7 +15,7 @@ let crypt = encode = decode = module.exports = function(data, sign = default_sig
 
 //有时效限制的加密解密算法，服务器时间要和客户机时间同步
 crypt.timevalid = 120000;
-crypt.encrypt = function(data,sign){
+crypt.encrypt = function(data,sign=default_sign){
     let timevalid = crypt.timevalid;
     let time = Date.now() - timevalid;   //Date.now()获取当前距1970年一月一号的毫秒数
     timevalid <<= 1;   //右移符号，相当于x2
@@ -27,7 +27,7 @@ crypt.encrypt = function(data,sign){
     //                                  4-5个buffer    
     return Buffer.concat([Buffer.from(remainder.length + remainder), time_signed, encode(data,sign)]);
 };
-crypt.decrypt = function(buff,sign){
+crypt.decrypt = function(buff,sign=default_sign){
     let timevalid = crypt.timevalid;
     let time = Date.now();
     timevalid <<= 1;
