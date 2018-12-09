@@ -50,7 +50,7 @@ function Product(i, ...arg) {
 //开启多进程 => 第一个进程用于执行任务,第二个进程用于执行任务期间查询并接收服务传来的状态
 let numCPUs = require("os").cpus().length;
 if (cluster.isMaster) {
-    //主进程的程序智慧运行一遍
+    //主进程的程序只会运行一遍
     //先检查所有远程机状态(20秒后才能返回检查结果)
     return new Promise(function (resolve, reject) {
         logger.info("启用的远程机ip", available_ip);
@@ -144,7 +144,7 @@ if (cluster.isMaster) {
                         //全部执行完再输出结果
                         logger.info("final result", s);
                         console.timeEnd("time");
-                        //将结果发送到子进程,父子进程和孖子进程传递消息与react类似
+                        //将结果发送到子进程,父子进程和子进程传递消息与react类似
                         Object.keys(cluster.workers).forEach((id) => {
                             cluster.workers[id].send(s);
                         });
